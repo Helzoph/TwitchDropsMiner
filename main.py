@@ -14,8 +14,6 @@ if __name__ == "__main__":
     import argparse
     import warnings
     import traceback
-    import tkinter as tk
-    from tkinter import messagebox
     from typing import NoReturn, TYPE_CHECKING
 
     import truststore
@@ -40,6 +38,21 @@ if __name__ == "__main__":
     if sys.version_info < (3, 10):
         raise RuntimeError("Python 3.10 or higher is required")
 
+    # handle input parameters
+    # we need to parse arguments first to know if we're in headless mode
+    # create a dummy parser to check for headless flag
+    headless_parser = argparse.ArgumentParser(add_help=False)
+    headless_parser.add_argument("--headless", action="store_true")
+    headless_args, unused = headless_parser.parse_known_args()
+    is_headless = headless_args.headless
+
+    if not is_headless:
+        import tkinter as tk
+        from tkinter import messagebox
+    else:
+        tk = None  # type: ignore
+        messagebox = None  # type: ignore
+
     class Parser(argparse.ArgumentParser):
         def __init__(self, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
@@ -53,7 +66,12 @@ if __name__ == "__main__":
             try:
                 super().exit(status, message)  # sys.exit(2)
             finally:
-                messagebox.showerror("Argument Parser Error", self._message.getvalue())
+                message = self._message.getvalue()
+                if message:
+                    if getattr(self, "headless", False) or messagebox is None:
+                        print(f"Argument Parser Error:\n{message}", file=sys.stderr)
+                    else:
+                        messagebox.showerror("Argument Parser Error", message)
 
     class ParsedArgs(argparse.Namespace):
         _verbose: int
@@ -62,6 +80,7 @@ if __name__ == "__main__":
         log: bool
         tray: bool
         dump: bool
+        headless: bool
 
         # TODO: replace int with union of literal values once typeshed updates
         @property
@@ -92,16 +111,22 @@ if __name__ == "__main__":
     # handle input parameters
     # NOTE: parser output is shown via message box
     # we also need a dummy invisible window for the parser
-    root = tk.Tk()
-    root.overrideredirect(True)
-    root.withdraw()
-    set_root_icon(root, resource_path("icons/pickaxe.ico"))
-    root.update()
+    root: Any | None = None
+    if not is_headless:
+        # tk and messagebox are already imported above if not is_headless
+        root = tk.Tk()
+        root.overrideredirect(True)
+        root.withdraw()
+        set_root_icon(root, resource_path("icons/pickaxe.ico"))
+        root.update()
+
     parser = Parser(
         SELF_PATH.name,
         description="A program that allows you to mine timed drops on Twitch.",
     )
+    parser.headless = is_headless
     parser.add_argument("--version", action="version", version=f"v{__version__}")
+    parser.add_argument("--headless", action="store_true")
     parser.add_argument("-v", dest="_verbose", action="count", default=0)
     parser.add_argument("--tray", action="store_true")
     parser.add_argument("--log", action="store_true")
@@ -118,15 +143,18 @@ if __name__ == "__main__":
     try:
         settings = Settings(args)
     except Exception:
-        messagebox.showerror(
-            "Settings error",
-            f"There was an error while loading the settings file:\n\n{traceback.format_exc()}"
-        )
+        message = f"There was an error while loading the settings file:\n\n{traceback.format_exc()}"
+        if is_headless or messagebox is None:
+            print(f"Settings error:\n{message}", file=sys.stderr)
+        else:
+            messagebox.showerror("Settings error", message)
         sys.exit(4)
+
     # dummy window isn't needed anymore
-    root.destroy()
+    if root is not None:
+        root.destroy()
     # get rid of unneeded objects
-    del root, parser
+    del root, parser, headless_parser, headless_args
 
     # client run
     async def main():
@@ -154,7 +182,7 @@ if __name__ == "__main__":
         exit_status = 0
         client = Twitch(settings)
         loop = asyncio.get_running_loop()
-        if sys.platform == "linux":
+        if sys.platform != "win32":
             loop.add_signal_handler(signal.SIGINT, lambda *_: client.gui.close())
             loop.add_signal_handler(signal.SIGTERM, lambda *_: client.gui.close())
         try:
@@ -169,7 +197,7 @@ if __name__ == "__main__":
             client.print("Fatal error encountered:\n")
             client.print(traceback.format_exc())
         finally:
-            if sys.platform == "linux":
+            if sys.platform != "win32":
                 loop.remove_signal_handler(signal.SIGINT)
                 loop.remove_signal_handler(signal.SIGTERM)
             client.print(_("gui", "status", "exiting"))

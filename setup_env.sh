@@ -11,35 +11,29 @@ if ! command -v git &> /dev/null; then
     exit 1
 fi
 
-# Check if the virtual environment exists
-if [ ! -d "$dirpath/env" ]; then
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
     echo
-    echo "Creating the env folder..."
-    python3 -m venv "$dirpath/env"
-    if [ $? -ne 0 ]; then
-        echo
-        echo "No python executable found in PATH or failed to create virtual environment!"
-        echo
-        read -p "Press any key to continue..."
-        exit 1
-    fi
+    echo "No uv executable found in PATH!"
+    echo "Please install uv: https://github.com/astral-sh/uv"
+    echo
+    read -p "Press any key to continue..."
+    exit 1
 fi
 
-# Activate the virtual environment and install requirements
+# Sync dependencies using uv
 echo
-echo "Installing requirements.txt..."
-"$dirpath/env/bin/python" -m pip install -U pip
-"$dirpath/env/bin/pip" install wheel
-"$dirpath/env/bin/pip" install -r "$dirpath/requirements.txt"
+echo "Syncing dependencies with uv..."
+uv sync
 if [ $? -ne 0 ]; then
     echo
-    echo "Failed to install requirements."
+    echo "Failed to sync dependencies."
     echo
     read -p "Press any key to continue..."
     exit 1
 fi
 
 echo
-echo "Environment setup completed successfully."
+echo "Environment setup completed successfully using uv."
 echo
 read -p "Press any key to continue..."

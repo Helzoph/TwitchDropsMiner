@@ -16,7 +16,7 @@ import aiohttp
 from yarl import URL
 
 from translate import _
-from gui import GUIManager
+from headless import HeadlessGUIManager
 from channel import Channel
 from websocket import WebsocketPool
 from inventory import DropsCampaign
@@ -56,7 +56,7 @@ from constants import (
 
 if TYPE_CHECKING:
     from utils import Game
-    from gui import LoginForm
+    from gui import GUIManager, LoginForm
     from channel import Stream
     from settings import Settings
     from inventory import TimedDrop
@@ -439,7 +439,11 @@ class Twitch:
         self._session: aiohttp.ClientSession | None = None
         self._auth_state: _AuthState = _AuthState(self)
         # GUI
-        self.gui = GUIManager(self)
+        if self.settings.headless:
+            self.gui: GUIManager = HeadlessGUIManager(self)  # type: ignore
+        else:
+            from gui import GUIManager
+            self.gui = GUIManager(self)
         # Storing and watching channels
         self.channels: OrderedDict[int, Channel] = OrderedDict()
         self.watching_channel: AwaitableValue[Channel] = AwaitableValue()

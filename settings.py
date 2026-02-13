@@ -96,6 +96,10 @@ class Settings:
     def alter(self) -> None:
         self._altered = True
 
+    def reload(self) -> None:
+        self._settings = json_load(SETTINGS_PATH, default_settings)
+        self._altered = False
+
     def save(self, *, force: bool = False) -> None:
         if self._altered or force:
             json_save(SETTINGS_PATH, self._settings, sort=True)

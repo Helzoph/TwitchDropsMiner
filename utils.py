@@ -11,7 +11,6 @@ import asyncio
 import logging
 import traceback
 import webbrowser
-import tkinter as tk
 from enum import Enum
 from pathlib import Path
 from functools import wraps
@@ -22,7 +21,6 @@ from collections import abc, OrderedDict
 from typing import Any, Literal, Callable, Generic, Mapping, TypeVar, ParamSpec, cast
 
 from yarl import URL
-from PIL.ImageTk import PhotoImage
 from PIL import Image as Image_module
 
 from exceptions import ExitRequest, ReloadRequest
@@ -37,7 +35,9 @@ _JSON_T = TypeVar("_JSON_T", bound=Mapping[Any, Any])
 logger = logging.getLogger("TwitchDrops")
 
 
-def set_root_icon(root: tk.Tk, image_path: Path | str) -> None:
+def set_root_icon(root: Any, image_path: Path | str) -> None:
+    import tkinter as tk
+    from PIL.ImageTk import PhotoImage
     with Image_module.open(image_path) as image:
         icon_photo = PhotoImage(master=root, image=image)
     root.iconphoto(True, icon_photo)  # type: ignore[arg-type]
