@@ -131,13 +131,15 @@ class Websocket:
                 aiohttp.ClientConnectionError,
             ):
                 ws_logger.info(
-                    f"Websocket[{self._idx}] connection problem (sleep: {round(delay)}s)"
+                    f"Websocket[{self._idx}] connection problem (sleep: {round(delay)}s)",
+                    extra={"label": "websocket", "idx": self._idx}
                 )
                 await asyncio.sleep(delay)
             except RuntimeError:
                 ws_logger.warning(
                     f"Websocket[{self._idx}] exiting backoff connect loop "
-                    "because session is closed (RuntimeError)"
+                    "because session is closed (RuntimeError)",
+                    extra={"label": "websocket", "idx": self._idx}
                 )
                 break
 
@@ -147,7 +149,7 @@ class Websocket:
         self.set_status(_("gui", "websocket", "initializing"))
         await self._twitch.wait_until_login()
         self.set_status(_("gui", "websocket", "connecting"))
-        ws_logger.info(f"Websocket[{self._idx}] connecting...")
+        ws_logger.info("Websocket connecting...", extra={"label": "websocket", "idx": self._idx})
         self._closed.clear()
         # Connect/Reconnect loop
         async for websocket in self._backoff_connect(
@@ -158,7 +160,7 @@ class Websocket:
             # NOTE: _topics_changed doesn't start set,
             # because there's no initial topics we can sub to right away
             self.set_status(_("gui", "websocket", "connected"))
-            ws_logger.info(f"Websocket[{self._idx}] connected.")
+            ws_logger.info("Websocket connected.", extra={"label": "websocket", "idx": self._idx})
             try:
                 try:
                     while not self._reconnect_requested.is_set():
@@ -175,17 +177,22 @@ class Websocket:
                 if exc.received:
                     # server closed the connection, not us - reconnect
                     ws_logger.warning(
-                        f"Websocket[{self._idx}] closed unexpectedly: {websocket.close_code}"
+                        "Websocket closed unexpectedly",
+                        extra={
+                            "label": "websocket",
+                            "idx": self._idx,
+                            "close_code": websocket.close_code,
+                        }
                     )
                 elif self._closed.is_set():
                     # we closed it - exit
-                    ws_logger.info(f"Websocket[{self._idx}] stopped.")
+                    ws_logger.info("Websocket stopped.", extra={"label": "websocket", "idx": self._idx})
                     self.set_status(_("gui", "websocket", "disconnected"))
                     return
             except Exception:
-                ws_logger.exception(f"Exception in Websocket[{self._idx}]")
+                ws_logger.exception("Exception in Websocket", extra={"label": "websocket", "idx": self._idx})
             self.set_status(_("gui", "websocket", "reconnecting"))
-            ws_logger.warning(f"Websocket[{self._idx}] reconnecting...")
+            ws_logger.warning("Websocket reconnecting...", extra={"label": "websocket", "idx": self._idx})
 
     async def _handle_ping(self):
         now = time()
@@ -195,7 +202,10 @@ class Websocket:
             await self.send({"type": "PING"})
         elif now >= self._max_pong:
             # it's been more than 10s and there was no PONG
-            ws_logger.warning(f"Websocket[{self._idx}] didn't receive a PONG, reconnecting...")
+            ws_logger.warning(
+                f"Websocket[{self._idx}] didn't receive a PONG, reconnecting...",
+                extra={"label": "websocket", "idx": self._idx}
+            )
             self.request_reconnect()
 
     async def _handle_topics(self):
@@ -210,7 +220,10 @@ class Websocket:
         removed = self._submitted.difference(current)
         if removed:
             topics_list = list(map(str, removed))
-            ws_logger.debug(f"Websocket[{self._idx}]: Removing topics: {', '.join(topics_list)}")
+            ws_logger.debug(
+                "Removing topics",
+                extra={"label": "websocket", "idx": self._idx, "topics": topics_list},
+            )
             for topics in chunk(topics_list, 20):
                 await self.send(
                     {
@@ -226,7 +239,10 @@ class Websocket:
         added = current.difference(self._submitted)
         if added:
             topics_list = list(map(str, added))
-            ws_logger.debug(f"Websocket[{self._idx}]: Adding topics: {', '.join(topics_list)}")
+            ws_logger.debug(
+                "Adding topics",
+                extra={"label": "websocket", "idx": self._idx, "topics": topics_list},
+            )
             for topics in chunk(topics_list, 20):
                 await self.send(
                     {
@@ -248,7 +264,10 @@ class Websocket:
         assert ws is not None
         while True:
             raw_message: aiohttp.WSMessage = await ws.receive(timeout=timeout)
-            ws_logger.debug(f"Websocket[{self._idx}] received: {raw_message}")
+            ws_logger.debug(
+            "Websocket received",
+            extra={"label": "websocket", "idx": self._idx, "payload": raw_message},
+        )
             if raw_message.type is WSMsgType.TEXT:
                 message: JsonType = json.loads(raw_message.data)
                 messages.append(message)
@@ -324,7 +343,10 @@ class Websocket:
         if message["type"] != "PING":
             message["nonce"] = create_nonce(CHARS_ASCII, 30)
         await ws.send_json(message, dumps=json_minify)
-        ws_logger.debug(f"Websocket[{self._idx}] sent: {message}")
+        ws_logger.debug(
+            "Websocket sent",
+            extra={"label": "websocket", "idx": self._idx, "payload": message},
+        )
 
 
 class WebsocketPool:

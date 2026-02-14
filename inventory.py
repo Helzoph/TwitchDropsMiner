@@ -180,7 +180,10 @@ class BaseDrop:
             )
             self._twitch.gui.tray.notify(claim_text, _("gui", "tray", "notification_title"))
         else:
-            logger.error(f"Drop claim has potentially failed! Drop ID: {self.id}")
+            logger.error(
+                "Drop claim has potentially failed!",
+                extra={"drop_id": self.id, "game": str(self.campaign.game)},
+            )
         return result
 
     async def _claim(self) -> bool:
@@ -451,7 +454,7 @@ class DropsCampaign:
         self, channel: Channel | None = None, ignore_channel_status: bool = False
     ) -> bool:
         return (
-            self.eligible  # account is eligible
+            (self.eligible or self._twitch.settings.ignore_eligibility)  # account is eligible
             and self.active  # campaign is active (and valid)
             and (
                 channel is None or (  # channel isn't specified,
@@ -491,7 +494,7 @@ class DropsCampaign:
         # Same as can_earn, but doesn't check the channel
         # and uses a future timestamp to see if we can earn this campaign later
         return (
-            self.eligible
+            (self.eligible or self._twitch.settings.ignore_eligibility)
             and self._valid
             and self.ends_at > datetime.now(timezone.utc)
             and self.starts_at < stamp

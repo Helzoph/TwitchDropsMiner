@@ -16,16 +16,19 @@ if TYPE_CHECKING:
     from inventory import TimedDrop, DropsCampaign
     from channel import Channel
     from yarl import URL
-    from gui import LoginData
 
 logger = logging.getLogger("TwitchDrops")
 
 class HeadlessStatusBar:
     def __init__(self, manager: HeadlessGUIManager):
         self._manager = manager
+        self._last_text: str = ""
 
     def update(self, text: str):
-        logger.info(f"Status: {text}")
+        if text == self._last_text:
+            return
+        self._last_text = text
+        logger.info(text, extra={"label": "status"})
 
     def clear(self):
         pass
@@ -36,7 +39,7 @@ class HeadlessWebsocketStatus:
 
     def update(self, idx: int, status: str | None = None, topics: int | None = None):
         if status:
-            logger.debug(f"Websocket {idx} status: {status}")
+            logger.debug(f"Websocket {idx} status: {status}", extra={"label": "websocket", "idx": idx})
 
     def remove(self, idx: int):
         pass
@@ -46,27 +49,23 @@ class HeadlessLoginForm:
         self._manager = manager
 
     async def ask_login(self) -> Any:
-        print("\n" + "="*50)
-        print("LOGIN REQUIRED")
+        logger.info("LOGIN REQUIRED", extra={"label": "login"})
         username = input("Username: ").strip()
         password = getpass.getpass("Password: ")
         token = input("2FA Token (leave empty if not required): ").strip()
-        print("="*50 + "\n")
         # We return a simple object with the required attributes
         from types import SimpleNamespace
         return SimpleNamespace(username=username, password=password, token=token)
 
     async def ask_enter_code(self, page_url: URL, user_code: str) -> None:
-        print("\n" + "="*50)
-        print(f"AUTH REQUIRED: Please visit {page_url}")
-        print(f"And enter the following code: {user_code}")
-        print("="*50 + "\n")
+        logger.info("AUTH REQUIRED", extra={"label": "login", "url": page_url})
+        logger.info("Enter code", extra={"label": "login", "code": user_code})
 
     def update(self, status: str, user_id: int | None):
         if user_id:
-            logger.info(f"Login status: {status} (User ID: {user_id})")
+            logger.info("Login status", extra={"label": "login", "status": status, "user_id": user_id})
         else:
-            logger.info(f"Login status: {status}")
+            logger.info(f"Login status: {status}", extra={"label": "login"})
 
 class HeadlessTrayIcon:
     def __init__(self, manager: HeadlessGUIManager):
@@ -99,8 +98,15 @@ class HeadlessProgress:
 
     def display(self, drop: TimedDrop | None, *, countdown: bool = True, subone: bool = False):
         if drop:
-            # logger.info(f"Progress: {drop.campaign.game.name} - {drop.name}: {drop.progress}%")
-            pass
+            logger.info(
+                f"Progress: {drop.campaign.game.name} - {drop.name}: {drop.progress}%",
+                extra={
+                    "label": "progress",
+                    "game": drop.campaign.game.name,
+                    "drop": drop.name,
+                    "progress": drop.progress,
+                }
+            )
 
     def minute_almost_done(self) -> bool:
         return False
@@ -141,7 +147,7 @@ class HeadlessChannels:
         return None
 
     def set_watching(self, channel: Channel):
-        logger.info(f"Watching: {channel.name}")
+        logger.info("Watching channel", extra={"label": "watching", "channel": channel.name})
 
     def clear_watching(self):
         pass
@@ -151,7 +157,8 @@ class HeadlessConsoleOutput:
         self._manager = manager
 
     def print(self, message: str):
-        print(message)
+        logger.info(message, extra={"label": "output"})
+
 
 class HeadlessGUIManager:
     def __init__(self, twitch: Twitch):
@@ -192,11 +199,11 @@ class HeadlessGUIManager:
                 continue
             if current_mtime > last_mtime:
                 last_mtime = current_mtime
-                logger.info("Settings file changed, reloading...")
+                logger.info("Settings file changed, reloading...", extra={"label": "settings"})
                 try:
                     self._twitch.settings.reload()
                 except Exception:
-                    logger.error("Failed to reload settings", exc_info=True)
+                    logger.error("Failed to reload settings", exc_info=True, extra={"label": "settings"})
                     continue
                 # update the language
                 try:
@@ -208,11 +215,11 @@ class HeadlessGUIManager:
                 self._twitch.change_state(State.GAMES_UPDATE)
 
     def start(self):
-        logger.info("Headless mode started")
+        logger.info("Headless mode started", extra={"label": "lifecycle"})
         self._watcher_task = asyncio.create_task(self._settings_watcher())
 
     def stop(self):
-        logger.info("Headless mode stopped")
+        logger.info("Headless mode stopped", extra={"label": "lifecycle"})
         if hasattr(self, "_watcher_task"):
             self._watcher_task.cancel()
 

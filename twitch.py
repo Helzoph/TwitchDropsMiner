@@ -74,7 +74,8 @@ class SkipExtraJsonDecoder(json.JSONDecoder):
         return obj
 
 
-SAFE_LOADS = lambda s: json.loads(s, cls=SkipExtraJsonDecoder)
+def SAFE_LOADS(s: str):
+    return json.loads(s, cls=SkipExtraJsonDecoder)
 
 
 class _AuthState:
@@ -181,7 +182,7 @@ class _AuthState:
                 continue
 
     async def _login(self) -> str:
-        logger.info("Login flow started")
+        logger.info("Login flow started", extra={"label": "login"})
         gui_print = self._twitch.gui.print
         login_form: LoginForm = self._twitch.gui.login
         client_info: ClientInfo = self._twitch._client_type
@@ -243,13 +244,13 @@ class _AuthState:
             # Error handling
             if "error_code" in login_response:
                 error_code: int = login_response["error_code"]
-                logger.info(f"Login error code: {error_code}")
+                logger.info("Login error", extra={"label": "login", "code": error_code})
                 if error_code == 1000:
-                    logger.info("1000: CAPTCHA is required")
+                    logger.info("1000: CAPTCHA is required", extra={"label": "login"})
                     use_chrome = True
                     break
                 elif error_code in (2004, 3001):
-                    logger.info("3001: Login failed due to incorrect username or password")
+                    logger.info("3001: Login failed due to incorrect username or password", extra={"label": "login"})
                     gui_print(_("login", "incorrect_login_pass"))
                     if error_code == 2004:
                         # invalid username
@@ -260,7 +261,7 @@ class _AuthState:
                     3012,  # Invalid authy token
                     3023,  # Invalid email code
                 ):
-                    logger.info("3012/23: Login failed due to incorrect 2FA code")
+                    logger.info("3012/23: Login failed due to incorrect 2FA code", extra={"label": "login"})
                     if error_code == 3023:
                         token_kind = "email"
                         gui_print(_("login", "incorrect_email_code"))
@@ -274,7 +275,7 @@ class _AuthState:
                     3022,  # Email code needed
                 ):
                     # 2FA handling
-                    logger.info("3011/22: 2FA token required")
+                    logger.info("3011/22: 2FA token required", extra={"label": "login"})
                     # user didn't provide a token, so ask them for it
                     if error_code == 3022:
                         token_kind = "email"
@@ -409,7 +410,7 @@ class _AuthState:
                 raise RuntimeError("Login verification failure (step #1)")
             self.user_id = int(validate_response["user_id"])
             cookie["persistent"] = str(self.user_id)
-            logger.info(f"Login successful, user ID: {self.user_id}")
+            logger.info("Login successful", extra={"user_id": self.user_id})
             login_form.update(_("gui", "login", "logged_in"), self.user_id)
             # update our cookie and save it
             jar.update_cookies(cookie, client_info.CLIENT_URL)
@@ -682,6 +683,7 @@ class Twitch:
                     ):
                         # non-excluded games with no priority are placed last, below priority ones
                         self.wanted_games.append(game)
+                logger.info("Wanted games", extra={"games": [str(g) for g in self.wanted_games]})
                 full_cleanup = True
                 self.restart_watching()
                 self.change_state(State.CHANNELS_CLEANUP)
@@ -952,7 +954,7 @@ class Twitch:
     @task_wrapper(critical=True)
     async def _maintenance_task(self) -> None:
         now = datetime.now(timezone.utc)
-        next_period = now + timedelta(hours=1)
+        next_period = now + timedelta(minutes=self.settings.inventory_refresh_interval)
         while True:
             # exit if there's no need to repeat the loop
             now = datetime.now(timezone.utc)
@@ -977,7 +979,7 @@ class Twitch:
             if next_trigger != next_period:
                 logger.log(CALL, "Maintenance task requests channels cleanup")
                 self.change_state(State.CHANNELS_CLEANUP)
-        # this triggers a restart of this task every (up to) 60 minutes
+        # this triggers a restart of this task every (up to) configured minutes
         logger.log(CALL, "Maintenance task requests a reload")
         self.change_state(State.INVENTORY_FETCH)
 
@@ -1024,6 +1026,7 @@ class Twitch:
         self.gui.tray.change_icon("active")
         self.gui.channels.set_watching(channel)
         self.watching_channel.set(channel)
+        logger.info("Watching channel", extra={"channel": channel.name, "game": str(channel.game)})
         if update_status:
             status_text = _("status", "watching").format(channel=channel.name)
             self.print(status_text)
@@ -1108,7 +1111,10 @@ class Twitch:
                     self.print(_("status", "goes_online").format(channel=channel.name))
                     self.watch(channel)
                 else:
-                    logger.info(f"{channel.name} goes ONLINE")
+                    logger.info(
+                        f"{channel.name} goes ONLINE playing {channel.game}",
+                        extra={"label": "status", "channel": channel.name, "game": str(channel.game)}
+                    )
             else:
                 # Channel was OFFLINE and stays that way
                 logger.log(CALL, f"{channel.name} stays OFFLINE")
@@ -1126,21 +1132,23 @@ class Twitch:
                         # Channel stays ONLINE, but we can't watch it anymore
                         logger.info(
                             f"{channel.name} status has been updated, switching... "
-                            f"(🎁: {stream_before.drops_enabled and '✔' or '❌'} -> "
+                            f"(Game: {stream_after.game}, Drops: "
+                            f"{stream_before.drops_enabled and '✔' or '❌'} -> "
                             f"{stream_after.drops_enabled and '✔' or '❌'})"
                         )
-                    self.change_state(State.CHANNEL_SWITCH)
+                        self.change_state(State.CHANNEL_SWITCH)
                 else:
                     # Channel stays ONLINE, and we can still watch it - no change
                     pass
             # NOTE: In these cases, it wasn't the watching channel
             elif stream_after is None:
-                logger.info(f"{channel.name} goes OFFLINE")
+                logger.info("Channel goes OFFLINE", extra={"label": "status", "channel": channel.name})
             else:
                 # Channel stays ONLINE, but has been updated
                 logger.info(
                     f"{channel.name} status has been updated "
-                    f"(🎁: {stream_before.drops_enabled and '✔' or '❌'} -> "
+                    f"(Game: {stream_after.game}, Drops: "
+                    f"{stream_before.drops_enabled and '✔' or '❌'} -> "
                     f"{stream_after.drops_enabled and '✔' or '❌'})"
                 )
                 if self.can_watch(channel) and self.should_switch(channel):
@@ -1489,21 +1497,21 @@ class Twitch:
             self._campaigns[campaign.id] = campaign
         # concurrently add the campaigns into the GUI
         # NOTE: this fetches pictures from the CDN, so might be slow without a cache
-        status_update(
-            _("gui", "status", "adding_campaigns").format(counter=f"(0/{len(campaigns)})")
-        )
+        total = len(campaigns)
+        status_update(_("gui", "status", "adding_campaigns").format(counter=f"(0/{total})"))
         add_campaign_tasks: list[asyncio.Task[None]] = [
             asyncio.create_task(self.gui.inv.add_campaign(campaign))
             for campaign in campaigns
         ]
         try:
+            # update every 20% or at least every 1 item
+            interval = max(1, total // 5)
             for i, coro in enumerate(asyncio.as_completed(add_campaign_tasks), start=1):
                 await coro
-                status_update(
-                    _("gui", "status", "adding_campaigns").format(
-                        counter=f"({i}/{len(campaigns)})"
+                if i == total or i % interval == 0:
+                    status_update(
+                        _("gui", "status", "adding_campaigns").format(counter=f"({i}/{total})")
                     )
-                )
                 # this is needed here explicitly, because cache reads from disk don't raise this
                 if self.gui.close_requested:
                     raise ExitRequest()

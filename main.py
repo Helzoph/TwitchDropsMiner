@@ -24,7 +24,7 @@ if __name__ == "__main__":
     from settings import Settings
     from version import __version__
     from exceptions import CaptchaRequired
-    from utils import lock_file, resource_path, set_root_icon
+    from utils import lock_file, resource_path, set_root_icon, JsonFormatter
     from constants import LOGGING_LEVELS, SELF_PATH, FILE_FORMATTER, LOG_PATH, LOCK_PATH
 
     if TYPE_CHECKING:
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     parser.headless = is_headless
     parser.add_argument("--version", action="version", version=f"v{__version__}")
     parser.add_argument("--headless", action="store_true")
-    parser.add_argument("-v", dest="_verbose", action="count", default=0)
+    parser.add_argument("-v", dest="_verbose", action="count", default=2 if is_headless else 0)
     parser.add_argument("--tray", action="store_true")
     parser.add_argument("--log", action="store_true")
     parser.add_argument("--dump", action="store_true")
@@ -172,12 +172,20 @@ if __name__ == "__main__":
             logging.getLogger().addHandler(logging.NullHandler())
         logger = logging.getLogger("TwitchDrops")
         logger.setLevel(settings.logging_level)
+        if settings.headless:
+            stdout_handler = logging.StreamHandler(sys.stdout)
+            stdout_handler.setFormatter(JsonFormatter())
+            logger.addHandler(stdout_handler)
         if settings.log:
             handler = logging.FileHandler(LOG_PATH)
-            handler.setFormatter(FILE_FORMATTER)
+            if settings.headless:
+                handler.setFormatter(JsonFormatter())
+            else:
+                handler.setFormatter(FILE_FORMATTER)
             logger.addHandler(handler)
         logging.getLogger("TwitchDrops.gql").setLevel(settings.debug_gql)
         logging.getLogger("TwitchDrops.websocket").setLevel(settings.debug_ws)
+        logger.info("Settings loaded", extra={"label": "settings"})
 
         exit_status = 0
         client = Twitch(settings)

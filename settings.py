@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any, TypedDict, TYPE_CHECKING
 
+import json
 from yarl import URL
 
-from utils import json_load, json_save
+from utils import json_load, json_save, logger, _serialize
 from constants import SETTINGS_PATH, DEFAULT_LANG, PriorityMode
 
 if TYPE_CHECKING:
@@ -22,7 +23,9 @@ class SettingsFile(TypedDict):
     tray_notifications: bool
     enable_badges_emotes: bool
     available_drops_check: bool
+    inventory_refresh_interval: int
     priority_mode: PriorityMode
+    ignore_eligibility: bool
 
 
 default_settings: SettingsFile = {
@@ -36,7 +39,9 @@ default_settings: SettingsFile = {
     "tray_notifications": True,
     "enable_badges_emotes": False,
     "available_drops_check": False,
+    "inventory_refresh_interval": 10,
     "priority_mode": PriorityMode.PRIORITY_ONLY,
+    "ignore_eligibility": False,
 }
 
 
@@ -61,6 +66,7 @@ class Settings:
     enable_badges_emotes: bool
     available_drops_check: bool
     priority_mode: PriorityMode
+    ignore_eligibility: bool
 
     PASSTHROUGH = ("_settings", "_args", "_altered")
 
@@ -68,6 +74,10 @@ class Settings:
         self._settings: SettingsFile = json_load(SETTINGS_PATH, default_settings)
         self._args: ParsedArgs = args
         self._altered: bool = False
+        logger.info(
+            f"Settings loaded: {json.dumps(self._settings, default=_serialize)}",
+            extra={"label": "settings"}
+        )
 
     # default logic of reading settings is to check args first, then the settings file
     def __getattr__(self, name: str, /) -> Any:
@@ -99,6 +109,10 @@ class Settings:
     def reload(self) -> None:
         self._settings = json_load(SETTINGS_PATH, default_settings)
         self._altered = False
+        logger.info(
+            f"Settings reloaded: {json.dumps(self._settings, default=_serialize)}",
+            extra={"label": "settings"}
+        )
 
     def save(self, *, force: bool = False) -> None:
         if self._altered or force:
