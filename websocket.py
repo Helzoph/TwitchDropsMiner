@@ -283,7 +283,10 @@ class Websocket:
                 )
                 raise WebsocketClosed()
             else:
-                ws_logger.error(f"Websocket[{self._idx}] error: Unknown message: {raw_message}")
+                ws_logger.error(
+                    "Websocket unknown message",
+                    extra={"idx": self._idx, "raw_message": str(raw_message)},
+                )
 
     def _handle_message(self, message):
         # request the assigned topic to process the response
@@ -313,10 +316,13 @@ class Websocket:
                 pass
             elif msg_type == "RECONNECT":
                 # We've received a reconnect request
-                ws_logger.warning(f"Websocket[{self._idx}] requested reconnect.")
+                ws_logger.warning("Websocket reconnect requested", extra={"idx": self._idx})
                 self.request_reconnect()
             else:
-                ws_logger.warning(f"Websocket[{self._idx}] received unknown payload: {message}")
+                ws_logger.warning(
+                    "Websocket unknown payload",
+                    extra={"idx": self._idx, "message": str(message)},
+                )
 
     def add_topics(self, topics_set: set[WebsocketTopic]):
         changed: bool = False

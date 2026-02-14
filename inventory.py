@@ -507,8 +507,8 @@ class DropsCampaign:
             # Executes if any drop's extra_current_minutes reach MAX_ESTIMATED_MINUTES
             # TODO: Figure out a better way to handle this case
             logger.warning(
-                f"At least one of the drops in campaign \"{self.name}({self.game.name})\" "
-                "has reached the maximum extra minutes limit!"
+                "Drop campaign reached maximum extra minutes limit",
+                extra={"campaign": f"{self.name}({self.game.name})"},
             )
             self._twitch.change_state(State.CHANNEL_SWITCH)
         if (first_drop := self.first_drop) is not None:

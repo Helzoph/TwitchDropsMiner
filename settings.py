@@ -75,8 +75,11 @@ class Settings:
         self._args: ParsedArgs = args
         self._altered: bool = False
         logger.info(
-            f"Settings loaded: {json.dumps(self._settings, default=_serialize)}",
-            extra={"label": "settings"}
+            "Settings loaded",
+            extra={
+                "label": "settings",
+                "settings": json.dumps(self._settings, default=_serialize),
+            },
         )
 
     # default logic of reading settings is to check args first, then the settings file
@@ -110,8 +113,11 @@ class Settings:
         self._settings = json_load(SETTINGS_PATH, default_settings)
         self._altered = False
         logger.info(
-            f"Settings reloaded: {json.dumps(self._settings, default=_serialize)}",
-            extra={"label": "settings"}
+            "Settings reloaded",
+            extra={
+                "label": "settings",
+                "settings": json.dumps(self._settings, default=_serialize),
+            },
         )
 
     def save(self, *, force: bool = False) -> None:

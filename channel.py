@@ -126,7 +126,9 @@ class Stream:
                 if isinstance(available_json, list):
                     available_json = available_json[0]
                 if "error" in available_json:
-                    logger.error(f"Stream URL get error: \"{available_json['error']}\"")
+                    logger.error(
+                        "Stream URL get error", extra={"error": available_json["error"]}
+                    )
                     self.channel.set_offline()
                 return None
             # pick the last URL from the list, usually with the lowest quality stream
@@ -350,7 +352,9 @@ class Channel:
                     GQL_OPERATIONS["AvailableDrops"].with_variables({"channelID": str(self.id)})
                 )
             except MinerException:
-                logger.log(CALL, f"AvailableDrops GQL call failed for channel: {self._login}")
+                logger.log(
+                    CALL, "AvailableDrops GQL call failed", extra={"channel": self._login}
+                )
             else:
                 stream.drops_enabled = self._check_drops_enabled(
                     available_drops_campaigns["data"]["channel"]["viewerDropCampaigns"] or []
@@ -450,7 +454,9 @@ class Channel:
             if isinstance(available_json, list):
                 available_json = available_json[0]
             if "error" in available_json:
-                logger.error(f"Send watch error: \"{available_json['error']}\"")
+                logger.error(
+                    "Send watch error", extra={"error": available_json["error"]}
+                )
             return False
         # the list contains ~10-13 chunks of the stream at 2s intervals,
         # pick the last chunk URL available. Ensure it's not the end-of-stream tag,

@@ -898,7 +898,7 @@ class Twitch:
             succeeded: bool = await channel.send_watch()
             last_sent: float = time()
             if not succeeded:
-                logger.log(CALL, f"Watch requested failed for channel: {channel.name}")
+                logger.log(CALL, "Watch request failed", extra={"channel": channel.name})
             # wait ~20 seconds for a progress update
             await asyncio.sleep(20)
             if self.gui.progress.minute_almost_done():
@@ -929,7 +929,11 @@ class Twitch:
                             f"{gql_drop.name} ({gql_drop.campaign.game}, "
                             f"{gql_drop.current_minutes}/{gql_drop.required_minutes})"
                         )
-                        logger.log(CALL, f"Drop progress from GQL: {drop_text}")
+                        logger.log(
+                            CALL,
+                            "Drop progress from GQL",
+                            extra={"drop": drop_text, "gql_drop": str(gql_drop)},
+                        )
                         handled = True
 
                 # Solution 2: If GQL fails, figure out which campaign we're most likely mining
@@ -945,7 +949,11 @@ class Twitch:
                                 f"{active_drop.name} ({active_drop.campaign.game}, "
                                 f"{active_drop.current_minutes}/{active_drop.required_minutes})"
                             )
-                        logger.log(CALL, f"Drop progress from active search: {drop_text}")
+                        logger.log(
+                            CALL,
+                            "Drop progress from active search",
+                            extra={"drop": drop_text},
+                        )
                         handled = True
                     else:
                         logger.log(CALL, "No active drop could be determined")
@@ -1046,7 +1054,10 @@ class Twitch:
         msg_type = message["type"]
         channel = self.channels.get(channel_id)
         if channel is None:
-            logger.error(f"Stream state change for a non-existing channel: {channel_id}")
+            logger.error(
+                "Stream state change for non-existing channel",
+                extra={"channel_id": channel_id},
+            )
             return
         if msg_type == "viewcount":
             if not channel.online:
@@ -1065,7 +1076,7 @@ class Twitch:
             # skip these
             pass
         else:
-            logger.warning(f"Unknown stream state: {msg_type}")
+            logger.warning("Unknown stream state", extra={"msg_type": msg_type})
 
     @task_wrapper
     async def process_stream_update(self, channel_id: int, message: JsonType):
@@ -1082,13 +1093,20 @@ class Twitch:
         # }
         channel = self.channels.get(channel_id)
         if channel is None:
-            logger.error(f"Broadcast settings update for a non-existing channel: {channel_id}")
+            logger.error(
+                "Broadcast settings update for non-existing channel",
+                extra={"channel_id": channel_id},
+            )
             return
         if message["old_game"] != message["game"]:
             game_change = f", game changed: {message['old_game']} -> {message['game']}"
         else:
             game_change = ''
-        logger.log(CALL, f"Channel update from websocket: {channel.name}{game_change}")
+        logger.log(
+            CALL,
+            "Channel update from websocket",
+            extra={"channel": channel.name, "game_change": game_change},
+        )
         # There's no information about channel tags here, but this event is triggered
         # when the tags change. We can use this to just update the stream data after the change.
         # Use 'check_online' to introduce a delay, allowing for multiple title and tags
@@ -1117,7 +1135,7 @@ class Twitch:
                     )
             else:
                 # Channel was OFFLINE and stays that way
-                logger.log(CALL, f"{channel.name} stays OFFLINE")
+                logger.log(CALL, "Channel stays OFFLINE", extra={"channel": channel.name})
         else:
             watching_channel = self.watching_channel.get_with_default(None)
             # check if the watching channel was the one updated
@@ -1209,7 +1227,7 @@ class Twitch:
             )
         else:
             drop_text = "<Unknown>"
-        logger.log(CALL, f"Drop update from websocket: {drop_text}")
+        logger.log(CALL, "Drop update from websocket", extra={"drop": drop_text})
         if drop is not None and drop.can_earn(self.watching_channel.get_with_default(None)):
             # the received payload is for the drop we expected
             drop.update_minutes(message["data"]["current_progress_min"])
@@ -1242,7 +1260,10 @@ class Twitch:
         method = method.upper()
         if self.settings.proxy and "proxy" not in kwargs:
             kwargs["proxy"] = self.settings.proxy
-        logger.debug(f"Request: ({method=}, {url=}, {kwargs=})")
+        logger.debug(
+            "HTTP Request",
+            extra={"method": method, "url": str(url), "kwargs": str(kwargs)},
+        )
         session_timeout = timedelta(seconds=session.timeout.total or 0)
         backoff = ExponentialBackoff(maximum=3*60)
         for delay in backoff:
@@ -1260,7 +1281,10 @@ class Twitch:
                     session.request(method, url, **kwargs)
                 )
                 assert response is not None
-                logger.debug(f"Response: {response.status}: {response}")
+                logger.debug(
+                    "HTTP Response",
+                    extra={"status": response.status, "response": str(response)},
+                )
                 if response.status < 500:
                     # pre-read the response to avoid getting errors outside of the context manager
                     raw_response = await response.read()  # noqa
@@ -1294,7 +1318,7 @@ class Twitch:
     async def gql_request(
         self, ops: GQLOperation | list[GQLOperation]
     ) -> JsonType | list[JsonType]:
-        gql_logger.debug(f"GQL Request: {ops}")
+        gql_logger.debug("GQL Request", extra={"ops": str(ops)})
         backoff = ExponentialBackoff(maximum=60)
         # Use a flag to retry the request a single time, if a specific set of errors is encountered
         single_retry: bool = True
@@ -1308,7 +1332,7 @@ class Twitch:
                     headers=auth_state.headers(user_agent=self._client_type.USER_AGENT, gql=True),
                 ) as response:
                     response_json: JsonType | list[JsonType] = await response.json()
-            gql_logger.debug(f"GQL Response: {response_json}")
+            gql_logger.debug("GQL Response", extra={"response": str(response_json)})
             orig_response = response_json
             if isinstance(response_json, list):
                 response_list = response_json
