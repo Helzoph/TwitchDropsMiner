@@ -1,0 +1,20 @@
+services:
+  miner:
+    build: .
+    container_name: twitch-drops-miner
+    restart: unless-stopped
+    volumes:
+      # Persist settings and session data
+      # Note: Ensure these files exist on your host or they will be created as directories
+      - ./settings.json:/app/settings.json
+      - ./cache:/app/cache
+      - ./cookies.jar:/app/cookies.jar
+      - ./log.txt:/app/log.txt
+    environment:
+      - TZ=Asia/Shanghai
+    # Necessary for some browser operations in Docker
+    cap_add:
+      - SYS_ADMIN
+    # Optional: If you need to see the output in real-time
+    tty: true
+    stdin_open: true
