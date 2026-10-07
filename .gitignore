@@ -11,6 +11,7 @@ __pycache__
 /*.tmp
 /Twitch Drops Miner
 # Dev files
+*.new
 /env
 /cache
 /*.jar
@@ -225,3 +226,5 @@ pyrightconfig.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
+.DS_Store
+*.app

@@ -160,6 +160,17 @@ class HeadlessConsoleOutput:
         logger.info(message, extra={"label": "output"})
 
 
+class HeadlessButton:
+    def config(self, **kwargs):
+        pass
+
+
+class HeadlessHelp:
+    def __init__(self, manager: HeadlessGUIManager):
+        self._manager = manager
+        self._invalidate_button = HeadlessButton()
+
+
 class HeadlessGUIManager:
     def __init__(self, twitch: Twitch):
         self._twitch: Twitch = twitch
@@ -174,6 +185,7 @@ class HeadlessGUIManager:
         self.inv = HeadlessInventory(self)
         self.channels = HeadlessChannels(self)
         self.output = HeadlessConsoleOutput(self)
+        self.help = HeadlessHelp(self)
         
         # Internal flags
         self.close_requested_flag = False

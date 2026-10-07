@@ -263,11 +263,14 @@ class Websocket:
         ws = self._ws.get_with_default(None)
         assert ws is not None
         while True:
-            raw_message: aiohttp.WSMessage = await ws.receive(timeout=timeout)
+            try:
+                raw_message: aiohttp.WSMessage = await ws.receive(timeout=timeout)
+            except aiohttp.ClientConnectionError:
+                raise WebsocketClosed(received=False)
             ws_logger.debug(
-            "Websocket received",
-            extra={"label": "websocket", "idx": self._idx, "payload": raw_message},
-        )
+                "Websocket received",
+                extra={"label": "websocket", "idx": self._idx, "payload": raw_message},
+            )
             if raw_message.type is WSMsgType.TEXT:
                 message: JsonType = json.loads(raw_message.data)
                 messages.append(message)
@@ -348,7 +351,10 @@ class Websocket:
         assert ws is not None
         if message["type"] != "PING":
             message["nonce"] = create_nonce(CHARS_ASCII, 30)
-        await ws.send_json(message, dumps=json_minify)
+        try:
+            await ws.send_json(message, dumps=json_minify)
+        except aiohttp.ClientConnectionError:
+            raise WebsocketClosed(received=False)
         ws_logger.debug(
             "Websocket sent",
             extra={"label": "websocket", "idx": self._idx, "payload": message},
