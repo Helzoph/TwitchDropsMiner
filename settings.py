@@ -45,6 +45,15 @@ default_settings: SettingsFile = {
 }
 
 
+# Rationale: 限定支持的代理协议，防止用户输入不被支持的 scheme 导致运行时错误；
+# 放在这里而不是 gui.py，让 headless 模式无需导入 tkinter 也能复用同一份校验
+_PROXY_SCHEMES = {"http", "socks4", "socks5"}
+
+
+def is_valid_proxy(url: URL) -> bool:
+    return url.scheme in _PROXY_SCHEMES and url.host is not None and url.port is not None
+
+
 class Settings:
     # from args
     log: bool

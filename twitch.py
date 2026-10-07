@@ -30,6 +30,7 @@ from exceptions import (
     CaptchaRequired,
     RequestException,
 )
+from settings import is_valid_proxy
 from utils import (
     CHARS_HEX_LOWER,
     chunk,
@@ -492,9 +493,18 @@ class Twitch:
         )
         # Rationale: 当配置了代理时，使用 ProxyConnector 替代 TCPConnector，
         # 统一支持 HTTP/SOCKS4/SOCKS5 代理，在 connector 层透明处理所有连接
-        if self.settings.proxy:
+        proxy = self.settings.proxy
+        # Rationale: settings.json 可被手动编辑（headless 模式下无 GUI 校验），
+        # 与 GUI 行为一致：无效代理视为未设置，直连并记录警告
+        if proxy and not is_valid_proxy(proxy):
+            logger.warning(
+                "Invalid proxy URL, ignoring it",
+                extra={"label": "settings", "proxy": str(proxy)},
+            )
+            proxy = URL()
+        if proxy:
             from aiohttp_socks import ProxyConnector
-            connector = ProxyConnector.from_url(str(self.settings.proxy), limit=50)
+            connector = ProxyConnector.from_url(str(proxy), limit=50)
         else:
             connector = aiohttp.TCPConnector(limit=50)
         self._session = aiohttp.ClientSession(

@@ -34,6 +34,7 @@ if sys.platform == "darwin":
     import AppKit
 
 from translate import _
+from settings import is_valid_proxy
 from cache import ImageCache
 from exceptions import MinerException, ExitRequest
 from utils import resource_path, set_root_icon, webopen, task_wrapper, Game, _T
@@ -1545,15 +1546,11 @@ class InventoryOverview:
         self.update_progress(drop, label)
 
 
-# Rationale: 限定支持的代理协议，防止用户输入不被支持的 scheme 导致运行时错误
-_PROXY_SCHEMES = {"http", "socks4", "socks5"}
-
-
 def proxy_validate(entry: PlaceholderEntry, settings: Settings) -> bool:
     raw_url = entry.get().strip()
     entry.replace(raw_url)
     url = URL(raw_url)
-    valid = url.scheme in _PROXY_SCHEMES and url.host is not None and url.port is not None
+    valid = is_valid_proxy(url)
     if not valid:
         entry.clear()
         url = URL()
