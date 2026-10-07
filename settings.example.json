@@ -1,0 +1,24 @@
+{
+    "autostart_tray": false,
+    "available_drops_check": false,
+    "connection_quality": 1,
+    "dark_mode": false,
+    "enable_badges_emotes": false,
+    "exclude": {
+        "__type": "set",
+        "data": []
+    },
+    "ignore_eligibility": false,
+    "inventory_refresh_interval": 10,
+    "language": "English",
+    "priority": [],
+    "priority_mode": {
+        "__type": "PriorityMode",
+        "data": 0
+    },
+    "proxy": {
+        "__type": "URL",
+        "data": ""
+    },
+    "tray_notifications": true
+}

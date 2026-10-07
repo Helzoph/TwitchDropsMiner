@@ -13,3 +13,5 @@ dump.dat
 lock.file
 cookies.jar
 cache/
+settings.json
+settings.json.new
