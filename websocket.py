@@ -116,13 +116,10 @@ class Websocket:
     ) -> abc.AsyncGenerator[aiohttp.ClientWebSocketResponse, None]:
         session = await self._twitch.get_session()
         backoff = ExponentialBackoff(**kwargs)
-        if self._twitch.settings.proxy:
-            proxy = self._twitch.settings.proxy
-        else:
-            proxy = None
+        # Rationale: 代理已在 session connector 层处理（ProxyConnector），无需逐请求注入
         for delay in backoff:
             try:
-                async with session.ws_connect(ws_url, proxy=proxy) as websocket:
+                async with session.ws_connect(ws_url) as websocket:
                     yield websocket
                     backoff.reset()
             except (

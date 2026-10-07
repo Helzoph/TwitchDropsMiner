@@ -1545,11 +1545,15 @@ class InventoryOverview:
         self.update_progress(drop, label)
 
 
+# Rationale: 限定支持的代理协议，防止用户输入不被支持的 scheme 导致运行时错误
+_PROXY_SCHEMES = {"http", "socks4", "socks5"}
+
+
 def proxy_validate(entry: PlaceholderEntry, settings: Settings) -> bool:
     raw_url = entry.get().strip()
     entry.replace(raw_url)
     url = URL(raw_url)
-    valid = url.host is not None and url.port is not None
+    valid = url.scheme in _PROXY_SCHEMES and url.host is not None and url.port is not None
     if not valid:
         entry.clear()
         url = URL()
@@ -1692,9 +1696,9 @@ class SettingsPanel:
             proxy_frame,
             width=37,
             validate="focusout",
-            prefill="http://",
+            prefill="",
             textvariable=self._vars["proxy"],
-            placeholder="http://username:password@address:port",
+            placeholder="[http|socks5]://user:pass@host:port",
         )
         self._proxy.config(validatecommand=partial(proxy_validate, self._proxy, self._settings))
         self._proxy.grid(column=0, row=1)
